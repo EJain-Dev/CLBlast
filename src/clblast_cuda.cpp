@@ -132,9 +132,14 @@ StatusCode Copy(const size_t n, const CUdeviceptr x_buffer, const size_t x_offse
     const auto context_cpp = Context(context);
     const auto device_cpp = Device(device);
     auto queue_cpp = Queue(context_cpp, device_cpp);
-    auto routine = Xcopy<T>(queue_cpp, nullptr);
-    routine.DoCopy(n, Buffer<T>(x_buffer), x_offset, x_inc, Buffer<T>(y_buffer), y_offset, y_inc);
-    return StatusCode::kSuccess;
+
+    StatusCode status = StatusCode::kSuccess;
+    auto routine = Xcopy<T>(queue_cpp, nullptr, status);
+    if (status != StatusCode::kSuccess) {
+      returns status;
+    }
+
+    return routine.DoCopy(n, Buffer<T>(x_buffer), x_offset, x_inc, Buffer<T>(y_buffer), y_offset, y_inc);
   } catch (...) {
     return DispatchException();
   }

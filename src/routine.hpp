@@ -57,7 +57,7 @@ class Routine {
   // and routine list, otherwise the caching logic will break.
   explicit Routine(Queue& queue, EventPointer event, const std::string& name, const std::vector<std::string>& routines,
                    const Precision precision, const std::vector<database::DatabaseEntry>& userDatabase,
-                   std::initializer_list<const char*> source);
+                   std::initializer_list<const char*> source, StatusCode& status);
 
   // List of kernel-routine look-ups
   static const std::vector<std::string> routines_axpy;
@@ -71,7 +71,7 @@ class Routine {
 
  private:
   // Initializes program_, fetching cached program or building one
-  void InitProgram(std::initializer_list<const char*> source);
+  StatusCode InitProgram(std::initializer_list<const char*> source);
 
  protected:
   // Non-static variable for the precision

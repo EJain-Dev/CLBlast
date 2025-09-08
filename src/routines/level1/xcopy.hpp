@@ -20,11 +20,11 @@ template <typename T>
 class Xcopy : public Routine {
  public:
   // Constructor
-  Xcopy(Queue& queue, EventPointer event, const std::string& name = "COPY");
+  Xcopy(Queue& queue, EventPointer event, StatusCode& status, const std::string& name = "COPY");
 
   // Templated-precision implementation of the routine
-  void DoCopy(const size_t n, const Buffer<T>& x_buffer, const size_t x_offset, const size_t x_inc,
-              const Buffer<T>& y_buffer, const size_t y_offset, const size_t y_inc);
+  StatusCode DoCopy(const size_t n, const Buffer<T>& x_buffer, const size_t x_offset, const size_t x_inc,
+                    const Buffer<T>& y_buffer, const size_t y_offset, const size_t y_inc);
 };
 
 // =================================================================================================

@@ -9,6 +9,7 @@
 #include <string>
 
 #include "cache.hpp"
+#include "clblast.h"
 #include "routines/routines.hpp"
 #include "utilities/utilities.hpp"
 
@@ -27,12 +28,17 @@ StatusCode ClearCache() {
 }
 
 template <typename Type>
-void FillCacheForPrecision(Queue& queue) {
+StatusCode FillCacheForPrecision(Queue& queue) {
   try {
+    StatusCode status = StatusCode::kSuccess;
+
     // Runs all the level 1 set-up functions that support all precisions
     Xswap<Type>(queue, nullptr);
     Xscal<Type>(queue, nullptr);
-    Xcopy<Type>(queue, nullptr);
+    Xcopy<Type>(queue, nullptr, status);
+    if (status != StatusCode::kSuccess) {
+      return status;
+    }
     Xaxpy<Type>(queue, nullptr);
     Xdot<Type>(queue, nullptr);
     Xnrm2<Type>(queue, nullptr);
@@ -64,13 +70,21 @@ void FillCacheForPrecision(Queue& queue) {
       throw;
     }
   }
+  return StatusCode::kSuccess;
 }
 
 template <typename Real, typename Complex>
-void FillCacheForPrecision(Queue& queue) {
+StatusCode FillCacheForPrecision(Queue& queue) {
   try {
-    FillCacheForPrecision<Real>(queue);
-    FillCacheForPrecision<Complex>(queue);
+    auto status = FillCacheForPrecision<Real>(queue);
+    if (status != StatusCode::kSuccess) {
+      return status;
+    }
+
+    status = FillCacheForPrecision<Complex>(queue);
+    if (status != StatusCode::kSuccess) {
+      return status;
+    }
 
     // Runs all the level 1 set-up functions that don't support all precisions
     Xdotu<Complex>(queue, nullptr);
@@ -108,6 +122,7 @@ void FillCacheForPrecision(Queue& queue) {
       throw;
     }
   }
+  return StatusCode::kSuccess;
 }
 
 // Fills the cache with all binaries for a specific device
@@ -118,9 +133,18 @@ StatusCode FillCache(const RawDeviceID device) {
     auto context = Context(device_cpp);
     auto queue = Queue(context, device_cpp);
 
-    FillCacheForPrecision<half>(queue);
-    FillCacheForPrecision<float, float2>(queue);
-    FillCacheForPrecision<double, double2>(queue);
+    auto status = FillCacheForPrecision<half>(queue);
+    if (status != StatusCode::kSuccess) {
+      return status;
+    }
+    status = FillCacheForPrecision<float, float2>(queue);
+    if (status != StatusCode::kSuccess) {
+      return status;
+    }
+    status = FillCacheForPrecision<double, double2>(queue);
+    if (status != StatusCode::kSuccess) {
+      return status;
+    }
 
   } catch (...) {
     return DispatchException();

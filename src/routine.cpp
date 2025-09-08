@@ -14,6 +14,8 @@
 #include <string>
 #include <vector>
 
+#include "clblast.h"
+
 namespace clblast {
 // =================================================================================================
 
@@ -51,7 +53,8 @@ const std::unordered_map<std::string, const std::vector<std::string>> Routine::r
 // The constructor does all heavy work, errors are returned as exceptions
 Routine::Routine(Queue& queue, EventPointer event, const std::string& name,
                  const std::vector<std::string>& kernel_names, const Precision precision,
-                 const std::vector<database::DatabaseEntry>& userDatabase, std::initializer_list<const char*> source)
+                 const std::vector<database::DatabaseEntry>& userDatabase, std::initializer_list<const char*> source,
+                 StatusCode& status)
     : precision_(precision),
       routine_name_(name),
       kernel_names_(kernel_names),
@@ -61,10 +64,10 @@ Routine::Routine(Queue& queue, EventPointer event, const std::string& name,
       device_(queue_.GetDevice()),
       db_(kernel_names) {
   InitDatabase(device_, kernel_names, precision, userDatabase, db_);
-  InitProgram(source);
+  status = InitProgram(source);
 }
 
-void Routine::InitProgram(std::initializer_list<const char*> source) {
+StatusCode Routine::InitProgram(std::initializer_list<const char*> source) {
   // Determines the identifier for this particular routine call
   auto routine_info = routine_name_;
   for (const auto& kernel_name : kernel_names_) {
@@ -76,7 +79,7 @@ void Routine::InitProgram(std::initializer_list<const char*> source) {
   bool has_program;
   program_ = ProgramCache::Instance().Get(ProgramKeyRef{context_(), device_(), precision_, routine_info}, &has_program);
   if (has_program) {
-    return;
+    return StatusCode::kSuccess;
   }
 
   // Sets the build options from an environmental variable (if set)
@@ -99,7 +102,7 @@ void Routine::InitProgram(std::initializer_list<const char*> source) {
     program_->Build(device_, options);
     ProgramCache::Instance().Store(ProgramKey{context_(), device_(), precision_, routine_info},
                                    std::shared_ptr<Program>{program_});
-    return;
+    return StatusCode::kSuccess;
   }
 
   // Otherwise, the kernel will be compiled and program will be built. Both the binary and the
@@ -108,12 +111,12 @@ void Routine::InitProgram(std::initializer_list<const char*> source) {
   // Inspects whether or not FP64 is supported in case of double precision
   if ((precision_ == Precision::kDouble && !PrecisionSupported<double>(device_)) ||
       (precision_ == Precision::kComplexDouble && !PrecisionSupported<double2>(device_))) {
-    throw RuntimeErrorCode(StatusCode::kNoDoublePrecision);
+    return StatusCode::kNoDoublePrecision;
   }
 
   // As above, but for FP16 (half precision)
   if (precision_ == Precision::kHalf && !PrecisionSupported<half>(device_)) {
-    throw RuntimeErrorCode(StatusCode::kNoHalfPrecision);
+    return StatusCode::kNoHalfPrecision;
   }
 
   // Collects the parameters for this device in the form of defines
@@ -135,6 +138,8 @@ void Routine::InitProgram(std::initializer_list<const char*> source) {
 
   ProgramCache::Instance().Store(ProgramKey{context_(), device_(), precision_, routine_info},
                                  std::shared_ptr<Program>{program_});
+
+  return StatusCode::kSuccess;
 }
 
 // =================================================================================================

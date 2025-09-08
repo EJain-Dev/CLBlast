@@ -17,29 +17,37 @@ namespace clblast {
 
 // Constructor: forwards to base class constructor
 template <typename T>
-Xcopy<T>::Xcopy(Queue& queue, EventPointer event, const std::string& name)
+Xcopy<T>::Xcopy(Queue& queue, EventPointer event, StatusCode& status, const std::string& name)
     : Routine(queue, event, name, {"Xaxpy"}, PrecisionValue<T>(), {},
               {
 #include "../../kernels/level1/level1.opencl"
 // (comment to prevent auto-re-ordering)
 #include "../../kernels/level1/xcopy.opencl"
-              }) {
+              },
+              status) {
 }
 
 // =================================================================================================
 
 // The main routine
 template <typename T>
-void Xcopy<T>::DoCopy(const size_t n, const Buffer<T>& x_buffer, const size_t x_offset, const size_t x_inc,
-                      const Buffer<T>& y_buffer, const size_t y_offset, const size_t y_inc) {
+StatusCode Xcopy<T>::DoCopy(const size_t n, const Buffer<T>& x_buffer, const size_t x_offset, const size_t x_inc,
+                            const Buffer<T>& y_buffer, const size_t y_offset, const size_t y_inc) {
   // Makes sure all dimensions are larger than zero
   if (n == 0) {
-    throw BLASError(StatusCode::kInvalidDimension);
+    return StatusCode::kInvalidDimension;
   }
 
   // Tests the vectors for validity
-  TestVectorX(n, x_buffer, x_offset, x_inc);
-  TestVectorY(n, y_buffer, y_offset, y_inc);
+  auto status = TestVectorX(n, x_buffer, x_offset, x_inc);
+  if (status != StatusCode::kSuccess) {
+    return status;
+  }
+
+  status = TestVectorY(n, y_buffer, y_offset, y_inc);
+  if (status != StatusCode::kSuccess) {
+    return status;
+  }
 
   // Determines whether or not the fast-version can be used
   bool use_fast_kernel = (x_offset == 0) && (x_inc == 1) && (y_offset == 0) && (y_inc == 1) &&
@@ -77,6 +85,8 @@ void Xcopy<T>::DoCopy(const size_t n, const Buffer<T>& x_buffer, const size_t x_
     auto local = std::vector<size_t>{db_["WGS"]};
     RunKernel(kernel, queue_, device_, global, local, event_);
   }
+
+  return StatusCode::kSuccess;
 }
 
 // =================================================================================================
